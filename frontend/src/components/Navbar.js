@@ -15,7 +15,7 @@ const Navbar = () => {
             <h1>💊 Medraksh</h1>
             <div>
                 {token ? (
-                    <button onClick={handleLogout} style={{width: 'auto', margin: 0}}>Logout</button>
+                    <button onClick={handleLogout} style={{border: '1px solid white'}}>Logout</button>
                 ) : (
                     <>
                         <Link to="/login">Login</Link>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 const Register = () => {
     const [formData, setFormData] = useState({ username: '', email: '', password: '' });
@@ -10,22 +10,46 @@ const Register = () => {
         e.preventDefault();
         try {
             await axios.post('http://localhost:5000/api/auth/register', formData);
-            alert('Registration Successful! Please Login.');
+            alert('Registration Successful! You can now login.');
             navigate('/login');
         } catch (err) {
-            alert('Error: ' + err.response.data.msg);
+            console.error(err);
+            alert(err.response?.data?.msg || 'Error registering user');
         }
     };
 
     return (
         <div className="container">
-            <h2>Register</h2>
-            <form onSubmit={handleSubmit}>
-                <input type="text" placeholder="Username" onChange={(e) => setFormData({...formData, username: e.target.value})} required />
-                <input type="email" placeholder="Email" onChange={(e) => setFormData({...formData, email: e.target.value})} required />
-                <input type="password" placeholder="Password" onChange={(e) => setFormData({...formData, password: e.target.value})} required />
-                <button type="submit">Register</button>
-            </form>
+            <div className="form-box">
+                <h2>Create Account</h2>
+                <p style={{marginBottom: '20px', color: '#666'}}>Join Medraksh to start tracking your health</p>
+
+                <form onSubmit={handleSubmit}>
+                    <input 
+                        type="text" 
+                        placeholder="Full Name" 
+                        onChange={(e) => setFormData({...formData, username: e.target.value})} 
+                        required 
+                    />
+                    <input 
+                        type="email" 
+                        placeholder="Email Address" 
+                        onChange={(e) => setFormData({...formData, email: e.target.value})} 
+                        required 
+                    />
+                    <input 
+                        type="password" 
+                        placeholder="Password" 
+                        onChange={(e) => setFormData({...formData, password: e.target.value})} 
+                        required 
+                    />
+                    <button type="submit">Sign Up</button>
+                </form>
+
+                <p style={{marginTop: '15px', fontSize: '0.9rem'}}>
+                    Already have an account? <Link to="/login" style={{color: '#0061f2', fontWeight: 'bold'}}>Login here</Link>
+                </p>
+            </div>
         </div>
     );
 };

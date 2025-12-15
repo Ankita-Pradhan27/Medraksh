@@ -7,62 +7,58 @@ const Dashboard = () => {
     const [form, setForm] = useState({ name: '', dosage: '', time: '', prescriptionImage: null });
     const navigate = useNavigate();
 
-    // Helper: Check if medicine was taken TODAY
     const isTakenToday = (dateString) => {
         if (!dateString) return false;
-        const takenDate = new Date(dateString);
-        const today = new Date();
-        return takenDate.toDateString() === today.toDateString();
+        return new Date(dateString).toDateString() === new Date().toDateString();
     };
 
-    // 1. Fetch Medicines (Wrapped in useCallback to fix warning)
     const fetchMedicines = useCallback(async () => {
         const token = localStorage.getItem('token');
         if (!token) return navigate('/login');
         try {
-            const res = await axios.get('http://localhost:5000/api/medicines', { 
-                headers: { 'x-auth-token': token } 
-            });
+            const res = await axios.get('http://localhost:5000/api/medicines', { headers: { 'x-auth-token': token } });
             setMedicines(res.data);
         } catch (err) { console.log(err); }
     }, [navigate]);
 
-    // 2. Mark as Taken Function (Wrapped in useCallback to fix warning)
     const markAsTaken = useCallback(async (id) => {
         const token = localStorage.getItem('token');
         try {
-            await axios.put(`http://localhost:5000/api/medicines/${id}/taken`, {}, {
-                headers: { 'x-auth-token': token }
-            });
-            alert("Great job! Medicine marked as taken.");
-            fetchMedicines(); 
-        } catch (err) {
-            alert("Error updating status");
-        }
+            await axios.put(`http://localhost:5000/api/medicines/${id}/taken`, {}, { headers: { 'x-auth-token': token } });
+            fetchMedicines();
+        } catch (err) { alert("Error"); }
     }, [fetchMedicines]);
 
-    // Initial Fetch
+    // NEW: Delete Function 🗑️
+    const deleteMedicine = async (id) => {
+        if (!window.confirm("Are you sure you want to delete this medicine?")) return;
+        
+        const token = localStorage.getItem('token');
+        try {
+            await axios.delete(`http://localhost:5000/api/medicines/${id}`, {
+                headers: { 'x-auth-token': token }
+            });
+            fetchMedicines(); // Refresh list immediately
+        } catch (err) {
+            alert("Error deleting medicine");
+        }
+    };
+
     useEffect(() => { fetchMedicines(); }, [fetchMedicines]);
 
-    // 3. The Alarm Clock ⏰
+    // Alarm Logic
     useEffect(() => {
         const interval = setInterval(() => {
-            const now = new Date();
-            const currentTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-
+            const currentTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
             medicines.forEach(med => {
                 if (med.time === currentTime && !isTakenToday(med.lastTaken)) {
-                    const userDidTake = window.confirm(`🔔 REMINDER: Time to take ${med.name}!\n\nDid you take it?`);
-                    if (userDidTake) {
-                        markAsTaken(med._id);
-                    }
+                    if (window.confirm(`🔔 Time to take ${med.name}!\nDid you take it?`)) markAsTaken(med._id);
                 }
             });
-        }, 12000); 
+        }, 12000);
         return () => clearInterval(interval);
-    }, [medicines, markAsTaken]); // Added markAsTaken to dependency array
+    }, [medicines, markAsTaken]);
 
-    // 4. Add Medicine Form
     const addMedicine = async (e) => {
         e.preventDefault();
         const token = localStorage.getItem('token');
@@ -82,44 +78,72 @@ const Dashboard = () => {
 
     return (
         <div className="container">
-            <h2>My Medicines</h2>
-            {medicines.map(med => (
-                <div key={med._id} className="card" style={{ 
-                    borderLeft: isTakenToday(med.lastTaken) ? '5px solid green' : '5px solid orange' 
-                }}>
-                    <div>
-                        <strong>{med.name}</strong> ({med.dosage})<br/>
-                        <span>⏰ {med.time}</span>
-                        <br/>
-                        {isTakenToday(med.lastTaken) ? (
-                            <span style={{color: 'green', fontWeight: 'bold'}}>✅ Taken Today</span>
-                        ) : (
-                            <span style={{color: 'orange'}}>⏳ Pending</span>
-                        )}
-                    </div>
-                    <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
-                        {!isTakenToday(med.lastTaken) && (
-                            <button onClick={() => markAsTaken(med._id)} style={{background: '#007bff', fontSize: '12px'}}>
-                                Mark Taken
-                            </button>
-                        )}
+            <h2 className="section-title">Your Daily Medicines</h2>
+            
+            <div className="grid-container">
+                {medicines.map(med => (
+                    <div key={med._id} className={`card ${isTakenToday(med.lastTaken) ? 'taken' : 'pending'}`}>
+                        {/* Header: Name and Time */}
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'start'}}>
+                            <div>
+                                <h3 style={{margin: 0, color: '#333'}}>{med.name}</h3>
+                                <p style={{color: '#666', fontSize: '0.9rem'}}>{med.dosage}</p>
+                            </div>
+                            <span style={{fontWeight: 'bold', color: '#0061f2'}}>⏰ {med.time}</span>
+                        </div>
+
+                        {/* Image Preview */}
                         {med.prescriptionImage && (
-                            <a href={`http://localhost:5000/${med.prescriptionImage}`} target="_blank" rel="noopener noreferrer">
-                                <img src={`http://localhost:5000/${med.prescriptionImage}`} alt="p" className="preview"/>
+                             <a href={`http://localhost:5000/${med.prescriptionImage}`} target="_blank" rel="noopener noreferrer">
+                                <img src={`http://localhost:5000/${med.prescriptionImage}`} alt="Prescription" className="preview"/>
                             </a>
                         )}
+
+                        {/* Status Bar */}
+                        <div style={{marginTop: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                            {isTakenToday(med.lastTaken) ? (
+                                <span className="status-badge status-success">✅ Taken Today</span>
+                            ) : (
+                                <span className="status-badge status-warning">⏳ Pending</span>
+                            )}
+                            
+                            {!isTakenToday(med.lastTaken) && (
+                                <button onClick={() => markAsTaken(med._id)} style={{width: 'auto', padding: '5px 15px', fontSize: '0.8rem', marginTop: 0}}>
+                                    Mark Taken
+                                </button>
+                            )}
+                        </div>
+
+                        {/* NEW: Delete Button 🗑️ */}
+                        <button 
+                            onClick={() => deleteMedicine(med._id)} 
+                            style={{
+                                background: '#dc3545', // Red color
+                                marginTop: '15px', 
+                                fontSize: '0.8rem',
+                                padding: '8px'
+                            }}
+                        >
+                            Delete Medicine
+                        </button>
                     </div>
-                </div>
-            ))}
-            <hr />
-            <h3>Add New Medicine</h3>
-            <form onSubmit={addMedicine}>
-                <input placeholder="Name" onChange={(e) => setForm({...form, name: e.target.value})} required />
-                <input placeholder="Dosage" onChange={(e) => setForm({...form, dosage: e.target.value})} required />
-                <input placeholder="Time (e.g. 09:15 PM)" onChange={(e) => setForm({...form, time: e.target.value})} required />
-                <input type="file" onChange={(e) => setForm({...form, prescriptionImage: e.target.files[0]})} />
-                <button type="submit">Add Reminder</button>
-            </form>
+                ))}
+            </div>
+
+            {/* Form Section */}
+            <div className="form-box" style={{margin: '0 auto', maxWidth: '600px'}}>
+                <h3>➕ Add New Reminder</h3>
+                <form onSubmit={addMedicine} style={{textAlign: 'left'}}>
+                    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px'}}>
+                        <input placeholder="Medicine Name" onChange={(e) => setForm({...form, name: e.target.value})} required />
+                        <input placeholder="Dosage" onChange={(e) => setForm({...form, dosage: e.target.value})} required />
+                    </div>
+                    <input placeholder="Time (e.g. 09:15 PM)" onChange={(e) => setForm({...form, time: e.target.value})} required />
+                    <label style={{fontWeight: 'bold', fontSize: '0.9rem', marginTop: '10px', display: 'block'}}>Upload Prescription (Optional):</label>
+                    <input type="file" onChange={(e) => setForm({...form, prescriptionImage: e.target.files[0]})} style={{background: 'white'}}/>
+                    <button type="submit">Save Reminder</button>
+                </form>
+            </div>
         </div>
     );
 };
