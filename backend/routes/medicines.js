@@ -63,4 +63,20 @@ router.delete('/:id', auth, async (req, res) => {
     }
 });
 
+router.put('/:id/taken', auth, async (req, res) => {
+    try {
+        let medicine = await Medicine.findById(req.params.id);
+        if (!medicine) return res.status(404).json({ msg: 'Medicine not found' });
+
+        // Update lastTaken to NOW
+        medicine.lastTaken = new Date();
+        
+        await medicine.save();
+        res.json(medicine);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+});
+
 module.exports = router;
