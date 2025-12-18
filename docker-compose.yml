@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./backend/.env
+    environment:
+      # FORCE the backend to use the local 'mongo' container defined below
+      - MONGO_URI=mongodb://mongo:27017/medraksh
+    depends_on:
+      - mongo
+      
+  # 2. Frontend Service
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    stdin_open: true # Fix for React exiting immediately in Docker
+    tty: true
+
+  # 3. Database Service (Optional: Runs a local MongoDB for you!)
+  mongo:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+volumes:
+  mongo-data:

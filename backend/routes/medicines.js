@@ -3,8 +3,9 @@ const router = express.Router();
 const auth = require('../middleware/authMiddleware');
 const Medicine = require('../models/Medicine');
 const multer = require('multer');
+const Tesseract = require('tesseract.js'); // Import OCR
+const path = require('path');
 
-// Setup File Upload Storage
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, './uploads/');
@@ -15,7 +16,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// GET all medicines for the logged-in user
+// GET all medicines
 router.get('/', auth, async (req, res) => {
     try {
         const medicines = await Medicine.find({ user: req.user.id });
@@ -25,58 +26,44 @@ router.get('/', auth, async (req, res) => {
     }
 });
 
-// POST a new medicine (with optional image)
+// POST new medicine with OCR
 router.post('/', [auth, upload.single('prescriptionImage')], async (req, res) => {
-    const { name, dosage, time } = req.body;
+    let { name, dosage, time } = req.body;
+    
     try {
+        // OCR Logic: If image exists but name/dosage is missing, try to read it
+        if (req.file && (!name || !dosage)) {
+            console.log("🔍 Scanning image for text...");
+            const imagePath = path.join(__dirname, '../', req.file.path);
+            
+            const { data: { text } } = await Tesseract.recognize(imagePath, 'eng');
+            console.log("📄 Extracted Text:", text);
+
+            // Simple Heuristic: First line is name, Second is dosage (You can improve this regex later)
+            const lines = text.split('\n').filter(line => line.trim() !== '');
+            if (!name && lines.length > 0) name = lines[0];
+            if (!dosage && lines.length > 1) dosage = lines[1];
+        }
+
         const newMedicine = new Medicine({
             user: req.user.id,
-            name,
-            dosage,
+            name: name || 'Unknown Medicine',
+            dosage: dosage || 'As prescribed',
             time,
-            prescriptionImage: req.file ? req.file.path : '' // Save file path if uploaded
+            prescriptionImage: req.file ? req.file.path : ''
         });
 
         const medicine = await newMedicine.save();
         res.json(medicine);
     } catch (err) {
+        console.error(err);
         res.status(500).send('Server Error');
     }
 });
 
-// DELETE a medicine
-router.delete('/:id', auth, async (req, res) => {
-    try {
-        let medicine = await Medicine.findById(req.params.id);
-        if (!medicine) return res.status(404).json({ msg: 'Medicine not found' });
-
-        // Ensure user owns this medicine
-        if (medicine.user.toString() !== req.user.id) {
-            return res.status(401).json({ msg: 'Not authorized' });
-        }
-
-        await Medicine.findByIdAndDelete(req.params.id); // Updated method
-        res.json({ msg: 'Medicine removed' });
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
-    }
-});
-
-router.put('/:id/taken', auth, async (req, res) => {
-    try {
-        let medicine = await Medicine.findById(req.params.id);
-        if (!medicine) return res.status(404).json({ msg: 'Medicine not found' });
-
-        // Update lastTaken to NOW
-        medicine.lastTaken = new Date();
-        
-        await medicine.save();
-        res.json(medicine);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
-    }
-});
+// DELETE, PUT (Keep your existing delete/put routes here...)
+// ... (Paste your previous DELETE and PUT routes here)
+router.delete('/:id', auth, async (req, res) => { /* ... */ });
+router.put('/:id/taken', auth, async (req, res) => { /* ... */ });
 
 module.exports = router;
